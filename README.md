@@ -1,1 +1,1 @@
-Code for upcoming machine working workshop at the 2018 Zaragoza IEEE days.
+Code for upcoming machine learning workshop at the 2018 Zaragoza IEEE days.
