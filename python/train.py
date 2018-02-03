@@ -25,7 +25,7 @@ def train(epochs=None):
     show_validation_CE_after = 1000
 
     # LOAD DATA.
-    train_input, train_target, valid_input, valid_target, test_input, test_target, vocab = load_data(batchsize)
+    çinput, train_target, valid_input, valid_target, test_input, test_target, vocab = load_data(batchsize)
     [numwords, batchsize, numbatches] = size(train_input)
     vocab_size = size(vocab, 2)
 
@@ -36,25 +36,25 @@ def train(epochs=None):
     hid_bias = zeros(numhid2, 1)
     output_bias = zeros(vocab_size, 1)
 
-    word_embedding_weights_delta = zeros(vocab_size, numhid1)
-    word_embedding_weights_gradient = zeros(vocab_size, numhid1)
-    embed_to_hid_weights_delta = zeros(numwords * numhid1, numhid2)
-    hid_to_output_weights_delta = zeros(numhid2, vocab_size)
-    hid_bias_delta = zeros(numhid2, 1)
-    output_bias_delta = zeros(vocab_size, 1)
-    expansion_matrix = eye(vocab_size)
+    word_embedding_weights_delta = np.zeros((vocab_size, numhid1))
+    word_embedding_weights_gradient = np.zeros((vocab_size, numhid1))
+    embed_to_hid_weights_delta = np.zeros((numwords * numhid1, numhid2))
+    hid_to_output_weights_delta = np.zeros((numhid2, vocab_size))
+    hid_bias_delta = np.zeros((numhid2, 1))
+    output_bias_delta = np.zeros((vocab_size, 1))
+    expansion_matrix = np.eye(vocab_size)
     count = 0
     tiny = exp(-30)
 
     # TRAIN.
-    for epoch in mslice[1:epochs]:
+    for epoch in range(1,epochs):
         fprintf(1, mstring('Epoch %d\\n'), epoch)
         this_chunk_CE = 0
         trainset_CE = 0
         # LOOP OVER MINI-BATCHES.
-        for m in mslice[1:numbatches]:
-            input_batch = train_input(mslice[:], mslice[:], m)
-            target_batch = train_target(mslice[:], mslice[:], m)
+        for m in range(1,numbatches):
+            input_batch = train_input[:, :, m]
+            target_batch = train_target[:, :, m]
 
             # FORWARD PROPAGATE.
             # Compute the state of each layer in the network given the input batch
