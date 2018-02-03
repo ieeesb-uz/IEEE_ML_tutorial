@@ -27,4 +27,5 @@ def load_data(N=None):
     test_input = data.testData(mslice[1:D], mslice[:])
     test_target = data.testData(D + 1, mslice[:])
     vocab = data.vocab
-    end
+    return train_input, train_target, valid_input, valid_target, test_input, test_target, vocab
+end
