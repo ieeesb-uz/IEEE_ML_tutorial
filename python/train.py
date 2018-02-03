@@ -1,3 +1,5 @@
+import time;  # This is required to include time module.
+
 # This function trains a neural network language model.
 @mfunction("model")
 def train(epochs=None):
@@ -6,14 +8,7 @@ def train(epochs=None):
     # Output:
     #   model: A struct containing the learned weights and biases and vocabulary.
 
-    if size(ver(mstring('Octave')), 1):
-        OctaveMode = 1
-        warning(mstring('error'), mstring('Octave:broadcast'))
-        start_time = time
-    else:
-        OctaveMode = 0
-        start_time = clock
-    end
+    ticks = time.time()
 
     # SET HYPERPARAMETERS HERE.
     batchsize = 100# Mini-batch size.
@@ -29,7 +24,7 @@ def train(epochs=None):
     show_validation_CE_after = 1000
 
     # LOAD DATA.
-    [train_input, train_target, valid_input, valid_target, test_input, test_target, vocab] = load_data(batchsize)
+    train_input, train_target, valid_input, valid_target, test_input, test_target, vocab = load_data(batchsize)
     [numwords, batchsize, numbatches] = size(train_input)
     vocab_size = size(vocab, 2)
 
