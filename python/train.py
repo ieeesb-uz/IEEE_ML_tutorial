@@ -25,7 +25,7 @@ def train(epochs=None):
     show_validation_CE_after = 1000
 
     # LOAD DATA.
-    çinput, train_target, valid_input, valid_target, test_input, test_target, vocab = load_data(batchsize)
+    train_input, train_target, valid_input, valid_target, test_input, test_target, vocab = load_data(batchsize)
     [numwords, batchsize, numbatches] = size(train_input)
     vocab_size = size(vocab, 2)
 
