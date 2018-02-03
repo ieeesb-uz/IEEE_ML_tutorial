@@ -1,4 +1,5 @@
-import time;  # This is required to include time module.
+import time  # This is required to include time module.
+import numpy as np
 
 # This function trains a neural network language model.
 @mfunction("model")
