@@ -1,3 +1,5 @@
+import scipy.io as sio
+
 @mfunction("train_input, train_target, valid_input, valid_target, test_input, test_target, vocab")
 def load_data(N=None):
     # This method loads the training, validation and test set.
@@ -14,7 +16,7 @@ def load_data(N=None):
     #   test: An array of size D X number of points in the test set.
     #   vocab: Vocabulary containing index to word mapping.
 
-    load(mstring('data.mat'))
+    data = sio.loadmat('data.mat')
     numdims = size(data.trainData, 1)
     D = numdims - 1
     M = floor(size(data.trainData, 2) / N)
