@@ -1,4 +1,5 @@
 import scipy.io as sio
+import numpy as np
 
 @mfunction("train_input, train_target, valid_input, valid_target, test_input, test_target, vocab")
 def load_data(N=None):
@@ -20,12 +21,12 @@ def load_data(N=None):
     numdims = size(data.trainData, 1)
     D = numdims - 1
     M = floor(size(data.trainData, 2) / N)
-    train_input = reshape(data.trainData(mslice[1:D], mslice[1:N * M]), D, N, M)
-    train_target = reshape(data.trainData(D + 1, mslice[1:N * M]), 1, N, M)
-    valid_input = data.validData(mslice[1:D], mslice[:])
-    valid_target = data.validData(D + 1, mslice[:])
-    test_input = data.testData(mslice[1:D], mslice[:])
-    test_target = data.testData(D + 1, mslice[:])
+    train_input = np.reshape(data['trainData'][mslice[1:D], mslice[1:N * M]], D, N, M)
+    train_target = np.reshape(data['trainData'][D + 1, mslice[1:N * M]], 1, N, M)
+    valid_input = data.validData[mslice[1:D], mslice[:]]
+    valid_target = data.validData[D + 1, mslice[:]]
+    test_input = data.testData[mslice[1:D], mslice[:]]
+    test_target = data.testData[D + 1, mslice[:]]
     vocab = data.vocab
     return train_input, train_target, valid_input, valid_target, test_input, test_target, vocab
 end
