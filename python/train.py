@@ -1,40 +1,36 @@
 import time  # This is required to include time module.
 import numpy as np
+from fprop import fprop
 
 # This function trains a neural network language model.
-@mfunction("model")
 def train(epochs=None):
     # Inputs:
     #   epochs: Number of epochs to run.
     # Output:
     #   model: A struct containing the learned weights and biases and vocabulary.
 
-    ticks = time.time()
-
-    # SET HYPERPARAMETERS HERE.
-    batchsize = 100# Mini-batch size.
-    learning_rate = 0.1# Learning rate; default = 0.1.
-    momentum = 0.5# Momentum; default = 0.9.
-    numhid1 = 50# Dimensionality of embedding space; default = 50.
-    numhid2 = 200# Number of units in hidden layer; default = 200.
-    init_wt = 0.01# Standard deviation of the normal distribution
+    batchsize = 100  # Mini-batch size.
+    learning_rate = 0.1  # Learning rate; default = 0.1.
+    momentum = 0.5  # Momentum; default = 0.9.
+    numhid1 = 50  # Dimensionality of embedding space; default = 50.
+    numhid2 = 200  # Number of units in hidden layer; default = 200.
+    init_wt = 0.01  # Standard deviation of the normal distribution
     # which is sampled to get the initial weights; default = 0.01
 
     # VARIABLES FOR TRACKING TRAINING PROGRESS.
-    show_training_CE_after = 100
-    show_validation_CE_after = 1000
+    show_training_CE_after = 100  # Frequency with which to show training cross-entropy error
+    show_validation_CE_after = 1000  # Frequency with which to show validation cross-entropy error
 
-    # LOAD DATA.
     train_input, train_target, valid_input, valid_target, test_input, test_target, vocab = load_data(batchsize)
-    [numwords, batchsize, numbatches] = size(train_input)
-    vocab_size = size(vocab, 2)
+    numwords, batchsize, numbatches = train_input.shape
+    vocab_size = vocab.shape[1]
 
     # INITIALIZE WEIGHTS AND BIASES.
-    word_embedding_weights = init_wt * randn(vocab_size, numhid1)
-    embed_to_hid_weights = init_wt * randn(numwords * numhid1, numhid2)
-    hid_to_output_weights = init_wt * randn(numhid2, vocab_size)
-    hid_bias = zeros(numhid2, 1)
-    output_bias = zeros(vocab_size, 1)
+    word_embedding_weights = np.random.normal(loc=0, scale=init_wt, size=(vocab_size, numhid1))
+    embed_to_hid_weights = np.random.normal(loc=0, scale=init_wt, size=(numwords * numhid1, numhid2))
+    hid_to_output_weights = np.random.normal(loc=0, scale=init_wt, size=(numhid2, vocab_size))
+    hid_bias = np.zeros((numhid2, 1))
+    output_bias = np.zeros((vocab_size, 1))
 
     word_embedding_weights_delta = np.zeros((vocab_size, numhid1))
     word_embedding_weights_gradient = np.zeros((vocab_size, numhid1))
@@ -44,148 +40,113 @@ def train(epochs=None):
     output_bias_delta = np.zeros((vocab_size, 1))
     expansion_matrix = np.eye(vocab_size)
     count = 0
-    tiny = exp(-30)
+    tiny = np.exp(-30)
 
     # TRAIN.
-    for epoch in range(1,epochs):
-        fprintf(1, mstring('Epoch %d\\n'), epoch)
+    tic_ = time.time()
+
+    for epoch in range(1, epochs + 1):
+
+        print('Epoch %d\n' % epoch)
         this_chunk_CE = 0
         trainset_CE = 0
+
         # LOOP OVER MINI-BATCHES.
-        for m in range(1,numbatches):
+        for m in range(1, numbatches):
             input_batch = train_input[:, :, m]
             target_batch = train_target[:, :, m]
 
             # FORWARD PROPAGATE.
             # Compute the state of each layer in the network given the input batch
             # and all weights and biases
-            [embedding_layer_state, hidden_layer_state, output_layer_state] = fprop(input_batch, word_embedding_weights, embed_to_hid_weights, hid_to_output_weights, hid_bias, output_bias)
+            embedding_layer_state, hidden_layer_state, output_layer_state = \
+                fprop(input_batch, word_embedding_weights, embed_to_hid_weights, hid_to_output_weights, hid_bias,
+                      output_bias)
 
             # COMPUTE DERIVATIVE.
-            #% Expand the target to a sparse 1-of-K vector.
-            expanded_target_batch = expansion_matrix(mslice[:], target_batch)
-            #% Compute derivative of cross-entropy loss function.
-            error_deriv = output_layer_state - expanded_target_batch
+            # % Expand the target to a sparse 1-of-K vector.
+            expanded_target_batch = expansion_matrix[:, target_batch - 1]
+            # % Compute derivative of cross-entropy loss function.
+            error_deriv = output_layer_state - np.squeeze(expanded_target_batch)
 
             # MEASURE LOSS FUNCTION.
-            CE = -sum(sum(expanded_target_batch *elmul* log(output_layer_state + tiny))) / batchsize
+            CE = -np.sum(np.sum(np.multiply(expanded_target_batch, np.log(output_layer_state + tiny)))) / batchsize
             count = count + 1
             this_chunk_CE = this_chunk_CE + (CE - this_chunk_CE) / count
             trainset_CE = trainset_CE + (CE - trainset_CE) / m
-            fprintf(1, mstring('\\rBatch %d Train CE %.3f'), m, this_chunk_CE)
-            if mod(m, show_training_CE_after) == 0:
-                fprintf(1, mstring('\\n'))
+            print 'Batch %d Train CE %1.3f' % (m, this_chunk_CE)
+            if m % show_training_CE_after == 0:
+                print('\n')
                 count = 0
                 this_chunk_CE = 0
-            end
-            if OctaveMode:
-                fflush(1)
-            end
 
+            ################
             # BACK PROPAGATE.
-            #% OUTPUT LAYER.
-            hid_to_output_weights_gradient = hidden_layer_state * error_deriv.cT
-            output_bias_gradient = sum(error_deriv, 2)
-            back_propagated_deriv_1 = (hid_to_output_weights * error_deriv) *elmul* hidden_layer_state *elmul* (1 - hidden_layer_state)
+            # % OUTPUT LAYER.
+            hid_to_output_weights_gradient = np.matmul(hidden_layer_state, error_deriv.T)
+            output_bias_gradient = np.sum(error_deriv, 1)
+            back_propagated_deriv_1_ = np.multiply(np.matmul(hid_to_output_weights, error_deriv), hidden_layer_state)
+            back_propagated_deriv_1 = np.multiply(back_propagated_deriv_1_, (1 - hidden_layer_state))
 
-            #% HIDDEN LAYER.
-            # FILL IN CODE. Replace the line below by one of the options.
-            #embed_to_hid_weights_gradient = zeros(numhid1 * numwords, numhid2);
-            # Options:
-            # (a) embed_to_hid_weights_gradient = back_propagated_deriv_1' * embedding_layer_state;
-            embed_to_hid_weights_gradient = embedding_layer_state * back_propagated_deriv_1.cT
-            # (c) embed_to_hid_weights_gradient = back_propagated_deriv_1;
-            # (d) embed_to_hid_weights_gradient = embedding_layer_state;
+            # % HIDDEN LAYER.
 
-            # FILL IN CODE. Replace the line below by one of the options.
-            #hid_bias_gradient = zeros(numhid2, 1);
-            # Options
-            hid_bias_gradient = sum(back_propagated_deriv_1, 2)
-            # (b) hid_bias_gradient = sum(back_propagated_deriv_1, 1);
-            # (c) hid_bias_gradient = back_propagated_deriv_1;
-            # (d) hid_bias_gradient = back_propagated_deriv_1';
+            embed_to_hid_weights_gradient = np.matmul(embedding_layer_state, back_propagated_deriv_1.T)
 
-            # FILL IN CODE. Replace the line below by one of the options.
-            #back_propagated_deriv_2 = zeros(numhid2, batchsize);
-            # Options
-            back_propagated_deriv_2 = embed_to_hid_weights * back_propagated_deriv_1
-            # (b) back_propagated_deriv_2 = back_propagated_deriv_1 * embed_to_hid_weights;
-            # (c) back_propagated_deriv_2 = back_propagated_deriv_1' * embed_to_hid_weights;
-            # (d) back_propagated_deriv_2 = back_propagated_deriv_1 * embed_to_hid_weights';
+            hid_bias_gradient = np.sum(back_propagated_deriv_1, 1)
 
-            0
-            #% EMBEDDING LAYER.
-            for w in mslice[1:numwords]:
-                word_embedding_weights_gradient = word_embedding_weights_gradient + expansion_matrix(mslice[:], input_batch(w, mslice[:])) * (back_propagated_deriv_2(mslice[1 + (w - 1) * numhid1:w * numhid1], mslice[:]).cT)
-            end
+            back_propagated_deriv_2 = np.matmul(embed_to_hid_weights, back_propagated_deriv_1)
+
+            word_embedding_weights_gradient[:] = 0
+
+            # % EMBEDDING LAYER.
+            for w in range(0, numwords):
+                bar = expansion_matrix[:, input_batch[w, :] - 1]
+                bareto = back_propagated_deriv_2[(w * numhid1): ((w + 1) * numhid1), :].T
+
+                foo = np.matmul(bar, bareto)
+                word_embedding_weights_gradient = word_embedding_weights_gradient + foo
 
             # UPDATE WEIGHTS AND BIASES.
-            word_embedding_weights_delta = momentum *elmul* word_embedding_weights_delta + word_embedding_weights_gradient /eldiv/ batchsize
-            word_embedding_weights = word_embedding_weights - learning_rate * word_embedding_weights_delta
+            word_embedding_weights_delta = np.multiply(momentum, word_embedding_weights_delta) + np.divide(
+                word_embedding_weights_gradient, batchsize)
+            word_embedding_weights = word_embedding_weights - (learning_rate * word_embedding_weights_delta)
 
-            embed_to_hid_weights_delta = momentum *elmul* embed_to_hid_weights_delta + embed_to_hid_weights_gradient /eldiv/ batchsize
-            embed_to_hid_weights = embed_to_hid_weights - learning_rate * embed_to_hid_weights_delta
+            embed_to_hid_weights_delta = np.multiply(momentum, embed_to_hid_weights_delta) + (
+            embed_to_hid_weights_gradient / batchsize)
+            embed_to_hid_weights = embed_to_hid_weights - (learning_rate * embed_to_hid_weights_delta)
 
-            hid_to_output_weights_delta = momentum *elmul* hid_to_output_weights_delta + hid_to_output_weights_gradient /eldiv/ batchsize
-            hid_to_output_weights = hid_to_output_weights - learning_rate * hid_to_output_weights_delta
+            hid_to_output_weights_delta = np.multiply(momentum, hid_to_output_weights_delta) + (
+            hid_to_output_weights_gradient / batchsize)
+            hid_to_output_weights = hid_to_output_weights - (learning_rate * hid_to_output_weights_delta)
 
-            hid_bias_delta = momentum *elmul* hid_bias_delta + hid_bias_gradient /eldiv/ batchsize
-            hid_bias = hid_bias - learning_rate * hid_bias_delta
+            hid_bias_delta = (momentum * hid_bias_delta) + (np.reshape(hid_bias_gradient, (-1, 1)) / batchsize)
+            hid_bias = hid_bias - (learning_rate * hid_bias_delta)
 
-            output_bias_delta = momentum *elmul* output_bias_delta + output_bias_gradient /eldiv/ batchsize
-            output_bias = output_bias - learning_rate * output_bias_delta
+            output_bias_delta = np.multiply(momentum, output_bias_delta) + (
+            np.reshape(output_bias_gradient, (-1, 1)) / batchsize)
+            output_bias = output_bias - (learning_rate * output_bias_delta)
 
             # VALIDATE.
-            if mod(m, show_validation_CE_after) == 0:
-                fprintf(1, mstring('\\rRunning validation ...'))
-                if OctaveMode:
-                    fflush(1)
-                end
-                [embedding_layer_state, hidden_layer_state, output_layer_state] = fprop(valid_input, word_embedding_weights, embed_to_hid_weights, hid_to_output_weights, hid_bias, output_bias)
-                datasetsize = size(valid_input, 2)
-                expanded_valid_target = expansion_matrix(mslice[:], valid_target)
-                CE = -sum(sum(expanded_valid_target *elmul* log(output_layer_state + tiny))) / datasetsize
-                fprintf(1, mstring(' Validation CE %.3f\\n'), CE)
-                if OctaveMode:
-                    fflush(1)
-                end
-            end
-        end
-        fprintf(1, mstring('\\rAverage Training CE %.3f\\n'), trainset_CE)
-    end
-    fprintf(1, mstring('Finished Training.\\n'))
-    if OctaveMode:
-        fflush(1)
-    end
-    fprintf(1, mstring('Final Training CE %.3f\\n'), trainset_CE)
+            if m % show_validation_CE_after == 0:
+                print('Running validation ...')
 
-    # EVALUATE ON VALIDATION SET.
-    fprintf(1, mstring('\\rRunning validation ...'))
-    if OctaveMode:
-        fflush(1)
-    end
-    [embedding_layer_state, hidden_layer_state, output_layer_state] = fprop(valid_input, word_embedding_weights, embed_to_hid_weights, hid_to_output_weights, hid_bias, output_bias)
-    datasetsize = size(valid_input, 2)
-    expanded_valid_target = expansion_matrix(mslice[:], valid_target)
-    CE = -sum(sum(expanded_valid_target *elmul* log(output_layer_state + tiny))) / datasetsize
-    fprintf(1, mstring('\\rFinal Validation CE %.3f\\n'), CE)
-    if OctaveMode:
-        fflush(1)
-    end
+                embedding_layer_state, hidden_layer_state, output_layer_state = fprop(valid_input,
+                                                                                      word_embedding_weights,
+                                                                                      embed_to_hid_weights,
+                                                                                      hid_to_output_weights, hid_bias,
+                                                                                      output_bias)
+                datasetsize = valid_input.shape[1]
+                expanded_valid_target = expansion_matrix[:, valid_target - 1]
+                CE = -np.sum(
+                    np.sum(np.multiply(expanded_valid_target, np.log(output_layer_state + tiny)))) / datasetsize
+                print 'Validation CE %1.3f \n' % (CE)
 
-    # EVALUATE ON TEST SET.
-    fprintf(1, mstring('\\rRunning test ...'))
-    if OctaveMode:
-        fflush(1)
-    end
-    [embedding_layer_state, hidden_layer_state, output_layer_state] = fprop(test_input, word_embedding_weights, embed_to_hid_weights, hid_to_output_weights, hid_bias, output_bias)
-    datasetsize = size(test_input, 2)
-    expanded_test_target = expansion_matrix(mslice[:], test_target)
-    CE = -sum(sum(expanded_test_target *elmul* log(output_layer_state + tiny))) / datasetsize
-    fprintf(1, mstring('\\rFinal Test CE %.3f\\n'), CE)
-    if OctaveMode:
-        fflush(1)
-    end
+    print('Finished Training.\n')
+
+    print'Final Training CE %.3f\n' % trainset_CE
+
+    toc_ = time.time()
+    print('Training took %.2f seconds\n' % (toc_ - tic_))
 
     model.word_embedding_weights = word_embedding_weights
     model.embed_to_hid_weights = embed_to_hid_weights
@@ -194,13 +155,27 @@ def train(epochs=None):
     model.output_bias = output_bias
     model.vocab = vocab
 
-    # In MATLAB replace line below with 'end_time = clock;'
-    if OctaveMode:
-        end_time = time
-        diff = end_time - start_time
-    else:
-        end_time = clock
+    # EVALUATE ON VALIDATION SET.
+    print('Running validation ...')
 
-    end
-    fprintf(1, mstring('Training took %.2f seconds\\n'), diff)
-end
+    [embedding_layer_state, hidden_layer_state, output_layer_state] = fprop(valid_input, word_embedding_weights,
+                                                                            embed_to_hid_weights, hid_to_output_weights,
+                                                                            hid_bias, output_bias)
+    datasetsize = valid_input.shape[1]
+    expanded_valid_target = expansion_matrix[:, valid_target - 1]
+    CE = -np.sum(np.sum(np.multiply(expanded_valid_target, np.log(output_layer_state + tiny)))) / datasetsize
+    print('Final Validation CE %.3f\n' % CE)
+
+    # EVALUATE ON TEST SET.
+    print('Running test ...')
+
+    [embedding_layer_state, hidden_layer_state, output_layer_state] = fprop(test_input, word_embedding_weights,
+                                                                            embed_to_hid_weights, hid_to_output_weights,
+                                                                            hid_bias, output_bias)
+    datasetsize = test_input.shape[1]
+    expanded_test_target = expansion_matrix[:, test_target - 1]
+    CE = -np.sum(np.sum(np.multiply(expanded_test_target, np.log(output_layer_state + tiny)))) / datasetsize
+    print('Final Test CE %.3f' % CE)
+
+
+    return model

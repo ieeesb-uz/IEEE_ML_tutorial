@@ -1,32 +1,37 @@
 import scipy.io as sio
 import numpy as np
 
-@mfunction("train_input, train_target, valid_input, valid_target, test_input, test_target, vocab")
-def load_data(N=None):
-    # This method loads the training, validation and test set.
-    # It also divides the training set into mini-batches.
-    # Inputs:
-    #   N: Mini-batch size.
-    # Outputs:
-    #   train_input: An array of size D X N X M, where
-    #                 D: number of input dimensions (in this case, 3).
-    #                 N: size of each mini-batch (in this case, 100).
-    #                 M: number of minibatches.
-    #   train_target: An array of size 1 X N X M.
-    #   valid_input: An array of size D X number of points in the validation set.
-    #   test: An array of size D X number of points in the test set.
-    #   vocab: Vocabulary containing index to word mapping.
 
+def load_data(batch_size=100):
     data = sio.loadmat('data.mat')
-    numdims = size(data.trainData, 1)
+    # data
+    test_data = data['data'][0][0][0]
+    train_data = data['data'][0][0][1]
+    valid_data = data['data'][0][0][2]
+    vocab = data['data'][0][0][3]
+    print(test_data.shape)
+    print(train_data.shape)
+    print(valid_data.shape)
+    print(vocab.shape)
+
+    numdims = train_data.shape[0]
     D = numdims - 1
-    M = floor(size(data.trainData, 2) / N)
-    train_input = np.reshape(data['trainData'][mslice[1:D], mslice[1:N * M]], D, N, M)
-    train_target = np.reshape(data['trainData'][D + 1, mslice[1:N * M]], 1, N, M)
-    valid_input = data.validData[mslice[1:D], mslice[:]]
-    valid_target = data.validData[D + 1, mslice[:]]
-    test_input = data.testData[mslice[1:D], mslice[:]]
-    test_target = data.testData[D + 1, mslice[:]]
-    vocab = data.vocab
+    M = train_data.shape[1] / batch_size
+
+    train_input = np.reshape(train_data[0:D, 0:batch_size * M], (D, batch_size, M))
+    train_target = np.reshape(train_data[D, 0:batch_size * M], (1, batch_size, M))
+    valid_input = valid_data[0:D, :]
+    valid_target = valid_data[D, :]
+    test_input = test_data[0:D, :]
+    test_target = test_data[D, :]
+    vocab = vocab
+
+    print(train_input.shape)
+    print(train_target.shape)
+    print(valid_input.shape)
+    print(valid_target.shape)
+    print(test_input.shape)
+    print(test_target.shape)
+    print(vocab.shape)
+
     return train_input, train_target, valid_input, valid_target, test_input, test_target, vocab
-end

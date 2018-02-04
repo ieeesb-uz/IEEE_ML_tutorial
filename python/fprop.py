@@ -1,78 +1,40 @@
-@mfunction("embedding_layer_state, hidden_layer_state, output_layer_state")
-def fprop(input_batch=None, word_embedding_weights=None, embed_to_hid_weights=None, hid_to_output_weights=None, hid_bias=None, output_bias=None):
-    # This method forward propagates through a neural network.
-    # Inputs:
-    #   input_batch: The input data as a matrix of size numwords X batchsize where,
-    #     numwords is the number of words, batchsize is the number of data points.
-    #     So, if input_batch(i, j) = k then the ith word in data point j is word
-    #     index k of the vocabulary.
-    #
-    #   word_embedding_weights: Word embedding as a matrix of size
-    #     vocab_size X numhid1, where vocab_size is the size of the vocabulary
-    #     numhid1 is the dimensionality of the embedding space.
-    #
-    #   embed_to_hid_weights: Weights between the word embedding layer and hidden
-    #     layer as a matrix of soze numhid1*numwords X numhid2, numhid2 is the
-    #     number of hidden units.
-    #
-    #   hid_to_output_weights: Weights between the hidden layer and output softmax
-    #               unit as a matrix of size numhid2 X vocab_size
-    #
-    #   hid_bias: Bias of the hidden layer as a matrix of size numhid2 X 1.
-    #
-    #   output_bias: Bias of the output layer as a matrix of size vocab_size X 1.
-    #
-    # Outputs:
-    #   embedding_layer_state: State of units in the embedding layer as a matrix of
-    #     size numhid1*numwords X batchsize
-    #
-    #   hidden_layer_state: State of units in the hidden layer as a matrix of size
-    #     numhid2 X batchsize
-    #
-    #   output_layer_state: State of units in the output layer as a matrix of size
-    #     vocab_size X batchsize
-    #
+import numpy as np
 
-    [numwords, batchsize] = size(input_batch)
-    [vocab_size, numhid1] = size(word_embedding_weights)
-    numhid2 = size(embed_to_hid_weights, 2)
+def fprop(input_batch=None, word_embedding_weights=None,
+          embed_to_hid_weights=None, hid_to_output_weights=None,
+          hid_bias=None, output_bias=None):
+    numwords, batchsize = input_batch.shape
+    vocab_size, numhid1 = word_embedding_weights.shape
+    numhid2 = embed_to_hid_weights.shape[1]
 
-    #% COMPUTE STATE OF WORD EMBEDDING LAYER.
+    # % COMPUTE STATE OF WORD EMBEDDING LAYER.
     # Look up the inputs word indices in the word_embedding_weights matrix.
-    embedding_layer_state = reshape(word_embedding_weights(reshape(input_batch, 1, mcat([])), mslice[:]).cT, numhid1 * numwords, mcat([]))
+    foo = word_embedding_weights[np.ndarray.flatten(input_batch - 1), :].T
 
-    #% COMPUTE STATE OF HIDDEN LAYER.
+    embedding_layer_state = np.reshape(foo, (numhid1 * numwords, -1))
+
+    # % COMPUTE STATE OF HIDDEN LAYER.
     # Compute inputs to hidden units.
-    inputs_to_hidden_units = embed_to_hid_weights.cT * embedding_layer_state + repmat(hid_bias, 1, batchsize)
+
+    inputs_to_hidden_units = np.matmul(embed_to_hid_weights.T, embedding_layer_state) + np.tile(hid_bias,
+                                                                                                (1, batchsize))
 
     # Apply logistic activation function.
-    # FILL IN CODE. Replace the line below by one of the options.
-    #hidden_layer_state = zeros(numhid2, batchsize);
-    # Options
-    # (a) hidden_layer_state = 1 ./ (1 + exp(inputs_to_hidden_units));
-    # (b) hidden_layer_state = 1 ./ (1 - exp(-inputs_to_hidden_units));
-    hidden_layer_state = 1 /eldiv/ (1 + exp(-inputs_to_hidden_units))
-    # (d) hidden_layer_state = -1 ./ (1 + exp(-inputs_to_hidden_units));
+    hidden_layer_state = np.divide(1, (1 + np.exp(-inputs_to_hidden_units)))
 
-    #% COMPUTE STATE OF OUTPUT LAYER.
+    # % COMPUTE STATE OF OUTPUT LAYER.
     # Compute inputs to softmax.
-    # FILL IN CODE. Replace the line below by one of the options.
-    #inputs_to_softmax = zeros(vocab_size, batchsize);
-    # Options
-    inputs_to_softmax = hid_to_output_weights.cT * hidden_layer_state + repmat(output_bias, 1, batchsize)
-    # (b) inputs_to_softmax = hid_to_output_weights' * hidden_layer_state +  repmat(output_bias, batchsize, 1);
-    # (c) inputs_to_softmax = hidden_layer_state * hid_to_output_weights' +  repmat(output_bias, 1, batchsize);
-    # (d) inputs_to_softmax = hid_to_output_weights * hidden_layer_state +  repmat(output_bias, batchsize, 1);
-
-    # Subtract maximum. 
+    inputs_to_softmax = np.matmul(hid_to_output_weights.T, hidden_layer_state) + np.tile(output_bias, (1, batchsize))
+    # Subtract maximum.
     # Remember that adding or subtracting the same constant from each input to a
     # softmax unit does not affect the outputs. Here we are subtracting maximum to
     # make all inputs <= 0. This prevents overflows when computing their
     # exponents.
-    inputs_to_softmax = inputs_to_softmax - repmat(max(inputs_to_softmax), vocab_size, 1)
+    inputs_to_softmax = inputs_to_softmax - np.tile(np.max(inputs_to_softmax), (vocab_size, 1))
 
     # Compute exp.
-    output_layer_state = exp(inputs_to_softmax)
+    output_layer_state = np.exp(inputs_to_softmax)
 
     # Normalize to get probability distribution.
-    output_layer_state = output_layer_state /eldiv/ repmat(sum(output_layer_state, 1), vocab_size, 1)
+    output_layer_state = np.divide(output_layer_state, np.tile(np.sum(output_layer_state, 0), (vocab_size, 1)))
+    return embedding_layer_state, hidden_layer_state, output_layer_state
